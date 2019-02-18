@@ -628,6 +628,7 @@ public class Manager {
   }
 
 
+  // Bandwidth消費の処理
   public void consumeBandwidth(TransactionCapsule trx, TransactionTrace trace)
       throws ContractValidateException, AccountResourceInsufficientException, TooBigTransactionResultException {
     BandwidthProcessor processor = new BandwidthProcessor(this);
@@ -638,6 +639,7 @@ public class Manager {
   /**
    * when switch fork need erase blocks on fork branch.
    */
+  // メインのブロックチェーンから1つ戻す。popedTransactionsにTxは記録される
   public synchronized void eraseBlock() {
     session.reset();
     try {
@@ -647,6 +649,7 @@ public class Manager {
       khaosDb.pop();
       revokingStore.fastPop();
       logger.info("end to erase block:" + oldHeadBlock);
+      // けされたブロックにはいってたtransactionを記録
       popedTransactions.addAll(oldHeadBlock.getTransactions());
 
     } catch (ItemNotFoundException | BadItemException e) {
@@ -654,7 +657,7 @@ public class Manager {
     }
   }
 
-  // 自分で生成したやつだよ
+  // SPVがブロックを受け入れるタイプ。
   public void pushVerifiedBlock(BlockCapsule block) throws ContractValidateException,
       ContractExeException, ValidateSignatureException, AccountResourceInsufficientException,
       TransactionExpirationException, TooBigTransactionException, DupTransactionException,
@@ -671,16 +674,21 @@ public class Manager {
         block.getTransactions().size());
   }
 
+  // 新ブロックやBlockIDをlocal DBにいれる。
   private void applyBlock(BlockCapsule block) throws ContractValidateException,
       ContractExeException, ValidateSignatureException, AccountResourceInsufficientException,
       TransactionExpirationException, TooBigTransactionException, DupTransactionException,
       TaposException, ValidateScheduleException, ReceiptCheckErrException,
       VMIllegalException, TooBigTransactionResultException {
+    // 実際の処理
     processBlock(block);
+    // revokingDBにsave
     this.blockStore.put(block.getBlockId().getBytes(), block);
     this.blockIndexStore.put(block.getBlockId());
+    // fork??
     updateFork(block);
     if (System.currentTimeMillis() - block.getTimeStamp() >= 60_000) {
+      // ????
       revokingStore.setMaxFlushCount(SnapshotManager.DEFAULT_MAX_FLUSH_COUNT);
     } else {
       revokingStore.setMaxFlushCount(SnapshotManager.DEFAULT_MIN_FLUSH_COUNT);
@@ -696,6 +704,9 @@ public class Manager {
       VMIllegalException {
     Pair<LinkedList<KhaosBlock>, LinkedList<KhaosBlock>> binaryTree;
     try {
+      // key: 新longest chain
+      // value: 信じてたけど短かったchain.
+      // それぞれ、共通祖先の次からのブロックへのリスト(新 => 古ブロックの方向)。
       binaryTree =
           khaosDb.getBranch(
               newHead.getBlockId(), getDynamicPropertiesStore().getLatestBlockHeaderHash());
@@ -721,9 +732,11 @@ public class Manager {
     if (CollectionUtils.isNotEmpty(binaryTree.getKey())) {
       List<KhaosBlock> first = new ArrayList<>(binaryTree.getKey());
       Collections.reverse(first);
+      // 新チェーンが、古 => 新 の順に。
       for (KhaosBlock item : first) {
         Exception exception = null;
         // todo  process the exception carefully later
+        // 1個ずつapplyしていくよ
         try (ISession tmpSession = revokingStore.buildSession()) {
           applyBlock(item.getBlk());
           tmpSession.commit();
@@ -744,20 +757,25 @@ public class Manager {
           throw e;
         } finally {
           if (exception != null) {
+            // 新チェーンapply時のエラー処理。元のチェーンに戻すぞ...!
             logger.warn("switch back because exception thrown while switching forks. " + exception
                     .getMessage(),
                 exception);
+            // khaosStoreから消しちゃう？？
             first.forEach(khaosBlock -> khaosDb.removeBlk(khaosBlock.getBlk().getBlockId()));
+            // HEADも元のチェーンに。
             khaosDb.setHead(binaryTree.getValue().peekFirst());
 
             while (!getDynamicPropertiesStore()
                 .getLatestBlockHeaderHash()
                 .equals(binaryTree.getValue().peekLast().getParentHash())) {
+              // 元チェーンの後ろから消していく。
               eraseBlock();
             }
 
             List<KhaosBlock> second = new ArrayList<>(binaryTree.getValue());
             Collections.reverse(second);
+            // 元チェーンを、古いほうから適用していく。
             for (KhaosBlock khaosBlock : second) {
               // todo  process the exception carefully later
               try (ISession tmpSession = revokingStore.buildSession()) {
@@ -772,6 +790,7 @@ public class Manager {
                   | TransactionExpirationException
                   | TooBigTransactionException
                   | ValidateScheduleException e) {
+                // エラったらログ吐くのみ。。
                 logger.warn(e.getMessage(), e);
               }
             }
@@ -856,6 +875,7 @@ public class Manager {
                   + ", khaosDb unlinkMiniStore size: "
                   + khaosDb.getMiniUnlinkedStore().size());
 
+          // longest chainにswitch
           switchFork(newBlock);
           logger.info("save block: " + newBlock);
 
@@ -879,6 +899,7 @@ public class Manager {
 
           return;
         }
+        // switch しないケースは普通にapply
         try (ISession tmpSession = revokingStore.buildSession()) {
           applyBlock(newBlock);
           tmpSession.commit();
@@ -1012,6 +1033,7 @@ public class Manager {
   /**
    * Process transaction.
    */
+  // TXの処理
   public boolean processTransaction(final TransactionCapsule trxCap, BlockCapsule blockCap)
       throws ValidateSignatureException, ContractValidateException, ContractExeException,
       AccountResourceInsufficientException, TransactionExpirationException, TooBigTransactionException, TooBigTransactionResultException,
@@ -1264,15 +1286,17 @@ public class Manager {
     // todo set revoking db max size.
 
     if (witnessService != null) {
+      // witnessとしてのチェック用処理。2つのブロックを重複生成していないか。
       witnessService.processBlock(block);
     }
 
-    // checkWitness
+    // slotとwitnessの関係は正しいか。
     if (!witnessController.validateWitnessSchedule(block)) {
       throw new ValidateScheduleException("validateWitnessSchedule error");
     }
 
     for (TransactionCapsule transactionCapsule : block.getTransactions()) {
+      // TaPoS用？にTxにblockNo格納
       transactionCapsule.setBlockNum(block.getNum());
       if (block.generatedByMyself) {
         transactionCapsule.setVerified(true);
@@ -1283,8 +1307,10 @@ public class Manager {
     boolean needMaint = needMaintenance(block.getTimeStamp());
     if (needMaint) {
       if (block.getNum() == 1) {
+        // genesisだったらかな？
         this.dynamicPropertiesStore.updateNextMaintenanceTime(block.getTimeStamp());
       } else {
+        // 6時間おきのやつやる。proposalの処理、SR入れ替え
         this.processMaintenance(block);
       }
     }
@@ -1375,7 +1401,6 @@ public class Manager {
   public void updateFork(BlockCapsule block) {
     forkController.update(block);
   }
-
   public long getSyncBeginNumber() {
     logger.info("headNumber:" + dynamicPropertiesStore.getLatestBlockHeaderNumber());
     logger.info(

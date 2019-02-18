@@ -93,8 +93,8 @@ public class WitnessController {
    * get slot at time.
    */
   public long getSlotAtTime(long when) {
-    // 今のブロックの基準時間
-    long firstSlotTime = getSlotTime(1);
+    // 相対slot: 今のブロックにおいて、何slot目か返す. (0-26)
+    long firstSlotTime = getSlotTime(1); // 今のブロックの最初の基準時間
     if (when < firstSlotTime) {
       return 0;
     }
@@ -165,17 +165,19 @@ public class WitnessController {
     if (manager.getDynamicPropertiesStore().getLatestBlockHeaderNumber() == 0) {
       return true;
     }
-    long blockAbSlot = getAbSlotAtTime(timeStamp);
+    long blockAbSlot = getAbSlotAtTime(timeStamp); // 最新ブロックの全経過slot数
     long headBlockAbSlot = getAbSlotAtTime(
-        manager.getDynamicPropertiesStore().getLatestBlockHeaderTimestamp());
+        manager.getDynamicPropertiesStore().getLatestBlockHeaderTimestamp()); // HEADブロックの全経過slot数
     if (blockAbSlot <= headBlockAbSlot) {
+      // 同じslot以下だったらだめ
       logger.warn("blockAbSlot is equals with headBlockAbSlot[" + blockAbSlot + "]");
       return false;
     }
 
-    long slot = getSlotAtTime(timeStamp);
+    long slot = getSlotAtTime(timeStamp); // 最新ブロックの相対slot
     final ByteString scheduledWitness = getScheduledWitness(slot);
     if (!scheduledWitness.equals(witnessAddress)) {
+      // このslotはこのwitnessじゃないエラー
       logger.warn(
           "Witness is out of order, scheduledWitness[{}],blockWitnessAddress[{}],blockTimeStamp[{}],slot[{}]",
           ByteArray.toHexString(scheduledWitness.toByteArray()),

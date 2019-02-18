@@ -11,6 +11,7 @@ import org.tron.core.db.common.WrappedByteArray;
 import org.tron.core.db.common.iterator.DBIterator;
 
 public class LevelDB implements DB<byte[], byte[]> {
+  // LevelDBへアクセスするぞ
   @Getter
   private LevelDbDataSourceImpl db;
   private WriteOptions writeOptions = new WriteOptions()

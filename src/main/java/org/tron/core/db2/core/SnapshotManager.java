@@ -38,7 +38,9 @@ public class SnapshotManager implements RevokingDatabase {
   // DefaultのStorage実装 (version 2)
 
   private static final int DEFAULT_STACK_MAX_SIZE = 256;
+  // 謎
   public static final int DEFAULT_MAX_FLUSH_COUNT = 500;
+  // 謎
   public static final int DEFAULT_MIN_FLUSH_COUNT = 1;
   @Getter
   private List<RevokingDBWithCachingNewValue> dbs = new ArrayList<>();
@@ -397,6 +399,7 @@ public class SnapshotManager implements RevokingDatabase {
   @Slf4j
   @Getter // only for unit test
   public static class Session implements ISession {
+    // snapshot session管理？
 
     private SnapshotManager snapshotManager;
     private boolean applySnapshot = true;

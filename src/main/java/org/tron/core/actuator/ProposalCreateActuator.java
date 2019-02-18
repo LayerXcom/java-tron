@@ -140,6 +140,7 @@ public class ProposalCreateActuator extends AbstractActuator {
   }
 
   private void validateValue(Map.Entry<Long, Long> entry) throws ContractValidateException {
+    // Proposeの値のバリデーション。
 
     switch (entry.getKey().intValue()) {
       case (0): {

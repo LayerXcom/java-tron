@@ -74,6 +74,7 @@ public class KhaosDatabase extends TronDatabase {
     }
   }
 
+  // KhaosBlockのKVS 順番つきで、最新1024個まで保持
   public class KhaosStore {
 
     private HashMap<BlockId, KhaosBlock> hashKblkMap = new HashMap<>();
@@ -144,11 +145,14 @@ public class KhaosDatabase extends TronDatabase {
 
   }
 
+  // HEAD (gitみたいな)
   private KhaosBlock head;
 
+  // 親がいるやつをためるところ
   @Getter
   private KhaosStore miniStore = new KhaosStore();
 
+  // 親がいないときに一時的にためるところ
   @Getter
   private KhaosStore miniUnlinkedStore = new KhaosStore();
 
@@ -227,20 +231,25 @@ public class KhaosDatabase extends TronDatabase {
     if (head != null && block.getParentHash() != Sha256Hash.ZERO_HASH) {
       KhaosBlock kblock = miniStore.getByHash(block.getParentHash());
       if (kblock != null) {
+        // 親がいたとき
         if (blk.getNum() != kblock.num + 1) {
+          // 親とblocknumちがうぞ！
           throw new BadNumberBlockException(
               "parent number :" + kblock.num + ",block number :" + blk.getNum());
         }
         block.setParent(kblock);
       } else {
+        // 親がいないなら貯めといて例外
         miniUnlinkedStore.insert(block);
         throw new UnLinkedBlockException();
       }
     }
 
+    // 親いる場合はここにたまる
     miniStore.insert(block);
 
     if (head == null || block.num > head.num) {
+      // HEADがうつるよ
       head = block;
     }
     return head.blk;
@@ -253,6 +262,7 @@ public class KhaosDatabase extends TronDatabase {
   /**
    * pop the head block then remove it.
    */
+  // gitみたいに、上のやつにポインタがうつる
   public boolean pop() {
     KhaosBlock prev = head.getParent();
     if (prev != null) {
@@ -270,15 +280,18 @@ public class KhaosDatabase extends TronDatabase {
   /**
    * Find two block's most recent common parent block.
    */
+  // 共通祖先までのパスをPair(リスト)でかえす。左は長い方。
+  // どちらかの祖先をもっていなかった場合、NonCommonBlockExceptionをthrow.
   public Pair<LinkedList<KhaosBlock>, LinkedList<KhaosBlock>> getBranch(Sha256Hash block1, Sha256Hash block2)
       throws NonCommonBlockException {
     LinkedList<KhaosBlock> list1 = new LinkedList<>();
     LinkedList<KhaosBlock> list2 = new LinkedList<>();
-    KhaosBlock kblk1 = miniStore.getByHash(block1);
+    KhaosBlock kblk1 = miniStore.getByHash(block1); // new block
     checkNull(kblk1);
-    KhaosBlock kblk2 = miniStore.getByHash(block2);
+    KhaosBlock kblk2 = miniStore.getByHash(block2); // 信じてたほう
     checkNull(kblk2);
 
+    // 以下、同じ長さになるように、長い方をlistに加えておく
     while (kblk1.num > kblk2.num) {
       list1.add(kblk1);
       kblk1 = kblk1.getParent();
@@ -293,6 +306,7 @@ public class KhaosDatabase extends TronDatabase {
       checkNull(miniStore.getByHash(kblk2.id));
     }
 
+    // 共通祖先にたどりつくまで、それぞれlistに加えていく
     while (!Objects.equals(kblk1, kblk2)) {
       list1.add(kblk1);
       list2.add(kblk2);

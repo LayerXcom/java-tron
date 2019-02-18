@@ -57,6 +57,7 @@ public class BandwidthProcessor extends ResourceProcessor {
     });
   }
 
+  // Bandwidth消費の処理
   @Override
   public void consume(TransactionCapsule trx, TransactionTrace trace)
       throws ContractValidateException, AccountResourceInsufficientException, TooBigTransactionResultException {

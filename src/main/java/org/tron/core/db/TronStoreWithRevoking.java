@@ -76,6 +76,7 @@ public abstract class TronStoreWithRevoking<T extends ProtoCapsule> implements I
     return of(revokingDB.get(key));
   }
 
+  // of して握りつぶす
   @Override
   public T getUnchecked(byte[] key) {
     byte[] value = revokingDB.getUnchecked(key);
@@ -87,6 +88,7 @@ public abstract class TronStoreWithRevoking<T extends ProtoCapsule> implements I
     }
   }
 
+  // T にするぞ
   public T of(byte[] value) throws BadItemException {
     try {
       Constructor constructor = token.getRawType().getConstructor(byte[].class);

@@ -13,6 +13,7 @@ import org.tron.core.db.common.WrappedByteArray;
 import org.tron.core.db2.common.LevelDB;
 
 public class SnapshotRoot extends AbstractSnapshot<byte[], byte[]> {
+  // LevelDBへのラッパー
 
   @Getter
   private Snapshot solidity;

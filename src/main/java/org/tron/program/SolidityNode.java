@@ -64,6 +64,7 @@ public class SolidityNode {
   }
 
   private void getBlock() {
+    // SPVが、remoteからブロック取得
     long blockNum = ID.incrementAndGet();
     while (flag) {
       try {

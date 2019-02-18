@@ -19,6 +19,7 @@ import org.tron.core.db2.common.Value;
 import org.tron.core.exception.ItemNotFoundException;
 
 public class RevokingDBWithCachingNewValue implements IRevokingDB {
+  // LevelDBをwrapし、かつ最新の値はcacheするKVS。
 
   //true:fullnode, false:soliditynode
   private ThreadLocal<Boolean> mode = new ThreadLocal<>();
@@ -119,6 +120,7 @@ public class RevokingDBWithCachingNewValue implements IRevokingDB {
     Snapshot snapshot = head;
     long tmp = limit;
     for (; tmp > 0 && snapshot.getPrevious() != null; snapshot = snapshot.getPrevious()) {
+      // valueをlimit分だけなめてaddする。
       if (!((SnapshotImpl) snapshot).db.isEmpty()) {
         --tmp;
         Streams.stream(((SnapshotImpl) snapshot).db)
@@ -129,6 +131,7 @@ public class RevokingDBWithCachingNewValue implements IRevokingDB {
     }
 
     if (snapshot.getPrevious() == null && tmp != 0) {
+      // 最後までいって、まだlimitがのこっているとき、LevelDBからも取る。
       result.addAll(((LevelDB) ((SnapshotRoot) snapshot).db).getDb().getlatestValues(tmp));
     }
 

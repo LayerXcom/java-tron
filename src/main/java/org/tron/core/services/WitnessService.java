@@ -62,8 +62,11 @@ public class WitnessService implements Service {
 
   private BackupServer backupServer;
 
+  // まじで謎
   private AtomicInteger dupBlockCount = new AtomicInteger(0);
+  // まじで謎
   private AtomicLong dupBlockTime = new AtomicLong(0);
+  // 3秒 * 27 = 81秒
   private long blockCycle =
       ChainConstant.BLOCK_PRODUCED_INTERVAL * ChainConstant.MAX_ACTIVE_WITNESS_NUM;
 
@@ -310,6 +313,7 @@ public class WitnessService implements Service {
     }
 
     if (System.currentTimeMillis() - dupBlockTime.get() > dupBlockCount.get() * blockCycle) {
+      // 3 * 27 = 81秒 よりも たってたとき
       dupBlockCount.set(0);
       return false;
     }
@@ -318,27 +322,35 @@ public class WitnessService implements Service {
   }
 
   public void processBlock(BlockCapsule block) {
+    // witnessとしての新ブロックチェック処理
+    // テストない。。
+
     if (block.generatedByMyself) {
-      // 自分のブロック生成だった
+      // 自分のブロック生成だったら
       return;
     }
 
     if (System.currentTimeMillis() - block.getTimeStamp() > ChainConstant.BLOCK_PRODUCED_INTERVAL) {
-      // ブロック生成から3秒たってた
+      // ブロック生成から3秒たってたら
       return;
     }
 
     if (!privateKeyMap.containsKey(block.getWitnessAddress())) {
-      // local witnessではない
+      // localWitnessでないなら
       return;
     }
 
+    // 以下、localWitnessとしての処理???
+    // https://github.com/tronprotocol/java-tron/pull/1640
     if (dupBlockCount.get() == 0) {
+      // 0なら、 0 - 10のランダム値をセット
       dupBlockCount.set(new Random().nextInt(10));
     } else {
+      // すでにあったら、10をセット
       dupBlockCount.set(10);
     }
 
+    // 今の時間
     dupBlockTime.set(System.currentTimeMillis());
   }
 
