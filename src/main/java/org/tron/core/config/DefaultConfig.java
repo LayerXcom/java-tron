@@ -43,6 +43,7 @@ public class DefaultConfig {
 
   @Bean
   public RevokingDatabase revokingDatabase() {
+    // 引数やconfigにより、versionは 1 or 2. defaultは2.
     int dbVersion = Args.getInstance().getStorage().getDbVersion();
     if (dbVersion == 1) {
       return RevokingStore.getInstance();

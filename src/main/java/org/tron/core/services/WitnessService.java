@@ -149,12 +149,15 @@ public class WitnessService implements Service {
   /**
    * Generate and broadcast blocks
    */
+  // Blockを自分がつくる起点。
   private BlockProductionCondition tryProduceBlock() throws InterruptedException {
     logger.info("Try Produce Block");
+    // Masterだよね
     if (!backupManager.getStatus().equals(BackupStatusEnum.MASTER)) {
       return BlockProductionCondition.BACKUP_STATUS_IS_NOT_MASTER;
     }
     if (dupWitnessCheck()) {
+      // ちょっとよくわからんので後で見る
       return BlockProductionCondition.DUP_WITNESS;
     }
     long now = DateTime.now().getMillis() + 50L;
@@ -165,6 +168,7 @@ public class WitnessService implements Service {
         Thread.sleep(nexSlotTime - now); //Processing Time Drift later
         now = DateTime.now().getMillis();
       } else {
+        // もうブロック生成時間すぎてる
         logger.debug("Not sync ,now:{},headBlockTime:{},headBlockNumber:{},headBlockId:{}",
             new DateTime(now),
             new DateTime(this.tronApp.getDbManager().getDynamicPropertiesStore()
@@ -175,6 +179,7 @@ public class WitnessService implements Service {
       }
     }
 
+    // 参加率
     final int participation = this.controller.calculateParticipationRate();
     if (participation < MIN_PARTICIPATION_RATE) {
       logger.warn(
@@ -314,14 +319,17 @@ public class WitnessService implements Service {
 
   public void processBlock(BlockCapsule block) {
     if (block.generatedByMyself) {
+      // 自分のブロック生成だった
       return;
     }
 
     if (System.currentTimeMillis() - block.getTimeStamp() > ChainConstant.BLOCK_PRODUCED_INTERVAL) {
+      // ブロック生成から3秒たってた
       return;
     }
 
     if (!privateKeyMap.containsKey(block.getWitnessAddress())) {
+      // local witnessではない
       return;
     }
 

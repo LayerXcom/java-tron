@@ -93,6 +93,7 @@ public class WitnessController {
    * get slot at time.
    */
   public long getSlotAtTime(long when) {
+    // 今のブロックの基準時間
     long firstSlotTime = getSlotTime(1);
     if (when < firstSlotTime) {
       return 0;
@@ -124,6 +125,7 @@ public class WitnessController {
   /**
    * get slot time.
    */
+  // そのslotになるべき時間をかえす
   public long getSlotTime(long slotNum) {
     if (slotNum == 0) {
       return Time.getCurrentMillis();
@@ -139,6 +141,7 @@ public class WitnessController {
     }
 
     long headSlotTime = manager.getDynamicPropertiesStore().getLatestBlockHeaderTimestamp();
+    //今の3秒でわったあまり(offset)をひくことで、最終ブロックの基準時間をもとめる
     headSlotTime = headSlotTime
         - ((headSlotTime - getGenesisBlock().getTimeStamp()) % interval);
 

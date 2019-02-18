@@ -534,6 +534,7 @@ public class Args {
       INSTANCE.longRunningTime = config.getInt("vm.longRunningTime");
     }
 
+    // Storageの生成箇所. 引数かconfigでバージョン判定
     INSTANCE.storage = new Storage();
     INSTANCE.storage.setDbVersion(Optional.ofNullable(INSTANCE.storageDbVersion)
         .filter(StringUtils::isNotEmpty)

@@ -654,6 +654,7 @@ public class Manager {
     }
   }
 
+  // 自分で生成したやつだよ
   public void pushVerifiedBlock(BlockCapsule block) throws ContractValidateException,
       ContractExeException, ValidateSignatureException, AccountResourceInsufficientException,
       TransactionExpirationException, TooBigTransactionException, DupTransactionException,
@@ -686,6 +687,7 @@ public class Manager {
     }
   }
 
+  // フォーク処理。新ブロックの親をもっていなかったケース。
   private void switchFork(BlockCapsule newHead)
       throws ValidateSignatureException, ContractValidateException, ContractExeException,
       ValidateScheduleException, AccountResourceInsufficientException, TaposException,
@@ -793,12 +795,15 @@ public class Manager {
     try (PendingManager pm = new PendingManager(this)) {
 
       if (!block.generatedByMyself) {
+        // 他人がつくったブロックのケース
         if (!block.validateSignature()) {
+          // witness署名検証
           logger.warn("The signature is not validated.");
           throw new BadBlockException("The signature is not validated");
         }
 
         if (!block.calcMerkleRoot().equals(block.getMerkleRoot())) {
+          // merkleroot検証
           logger.warn(
               "The merkle root doesn't match, Calc result is "
                   + block.calcMerkleRoot()
@@ -811,11 +816,14 @@ public class Manager {
       BlockCapsule newBlock = this.khaosDb.push(block);
 
       // DB don't need lower block
+      // まず、直近のブロックハッシュはあるよね
       if (getDynamicPropertiesStore().getLatestBlockHeaderHash() == null) {
+        // なかったとしても、genesis blockだよね
         if (newBlock.getNum() != 0) {
           return;
         }
       } else {
+        // 新しいブロック高のが高いか確認
         if (newBlock.getNum() <= getDynamicPropertiesStore().getLatestBlockHeaderNumber()) {
           return;
         }
@@ -824,6 +832,7 @@ public class Manager {
         if (!newBlock
             .getParentHash()
             .equals(getDynamicPropertiesStore().getLatestBlockHeaderHash())) {
+          // 新ブロックの親が、もってた最新ブロックと違うぞ？
           logger.warn(
               "switch fork! new head num = {}, blockid = {}",
               newBlock.getNum(),

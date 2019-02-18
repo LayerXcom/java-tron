@@ -209,6 +209,7 @@ public class BlockCapsule implements ProtoCapsule<Block> {
     return Sha256Hash.of(this.block.getBlockHeader().getRawData().toByteArray());
   }
 
+  // ブロックヘッダでのwitnessの署名が正しいか検証
   public boolean validateSignature() throws ValidateSignatureException {
     try {
       return Arrays
