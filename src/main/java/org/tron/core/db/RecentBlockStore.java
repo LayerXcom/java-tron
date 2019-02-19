@@ -10,6 +10,7 @@ import org.tron.core.exception.ItemNotFoundException;
 
 @Component
 public class RecentBlockStore extends TronStoreWithRevoking<BytesCapsule> {
+  // Taposのvalidate用
 
   @Autowired
   private RecentBlockStore(@Value("recent-block") String dbName) {

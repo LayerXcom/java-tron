@@ -35,13 +35,15 @@ import org.tron.core.exception.RevokingStoreIllegalStateException;
 
 @Slf4j
 public class SnapshotManager implements RevokingDatabase {
-  // DefaultのStorage実装 (version 2)
+  // DefaultのRevokingDatabase実装。 (version 2)
+  // 各種DB(RevokingDBWithCachingNewValue)を管理する。
 
   private static final int DEFAULT_STACK_MAX_SIZE = 256;
   // 謎
   public static final int DEFAULT_MAX_FLUSH_COUNT = 500;
   // 謎
   public static final int DEFAULT_MIN_FLUSH_COUNT = 1;
+  // リストでRevokingDBWithCachingNewValueをもつよ
   @Getter
   private List<RevokingDBWithCachingNewValue> dbs = new ArrayList<>();
   @Getter
@@ -65,29 +67,35 @@ public class SnapshotManager implements RevokingDatabase {
   private LevelDbDataSourceImpl tmpLevelDbDataSource;
 
   @Setter
-  private volatile int maxFlushCount = DEFAULT_MIN_FLUSH_COUNT;
+  private volatile int maxFlushCount = DEFAULT_MIN_FLUSH_COUNT; // [TODO] maxなのにMIN??
 
   public ISession buildSession() {
     return buildSession(false);
   }
 
+  // 同期的にsession開始。snapshotを1つすすめる。
   public synchronized ISession buildSession(boolean forceEnable) {
+    // TODO disableなのにsessionつくれるのか
     if (disabled && !forceEnable) {
       return new Session(this);
     }
 
+    // forceEnableなら、disable時にむりやりやってから、最後にdisable
     boolean disableOnExit = disabled && forceEnable;
     if (forceEnable) {
       disabled = false;
     }
 
+    // advance前に、snapshot数をチェック。 default: max 256
     if (size > maxSize.get()) {
       flushCount = flushCount + (size - maxSize.get());
+      // 過去256stackまでは安定化する(solidity snapshotが進む)
       updateSolidity(size - maxSize.get());
       size = maxSize.get();
       flush();
     }
 
+    // 各DBをadvance.
     advance();
     ++activeSession;
     return new Session(this, disableOnExit);
@@ -108,16 +116,19 @@ public class SnapshotManager implements RevokingDatabase {
         )));
   }
 
+  // 各DBを一気にadvanceしてHEADに設定
   private void advance() {
     dbs.forEach(db -> db.setHead(db.getHead().advance()));
     ++size;
   }
 
+  // 各DBを一気にretreat(後退)してHEADに設定
   private void retreat() {
     dbs.forEach(db -> db.setHead(db.getHead().retreat()));
     --size;
   }
 
+  // 各DB、一気に直近2ブロックをマージしてcommit
   public void merge() {
     if (activeSession <= 0) {
       throw new RevokingStoreIllegalStateException("activeDialog has to be greater than 0");
@@ -128,10 +139,12 @@ public class SnapshotManager implements RevokingDatabase {
     }
 
     dbs.forEach(db -> db.getHead().getPrevious().merge(db.getHead()));
+    // 後退してHEADに設定
     retreat();
     --activeSession;
   }
 
+  // retreatしてcommit
   public synchronized void revoke() {
     if (disabled) {
       return;
@@ -155,6 +168,7 @@ public class SnapshotManager implements RevokingDatabase {
     --activeSession;
   }
 
+  // sessionおわらす
   public synchronized void commit() {
     if (activeSession <= 0) {
       throw new RevokingStoreIllegalStateException("activeSession has to be greater than 0");
@@ -163,6 +177,8 @@ public class SnapshotManager implements RevokingDatabase {
     --activeSession;
   }
 
+  // sessionないときのretreat?
+  // [TODO]disableチェックがない？
   public synchronized void pop() {
     if (activeSession != 0) {
       throw new RevokingStoreIllegalStateException("activeSession has to be equal 0");
@@ -208,6 +224,7 @@ public class SnapshotManager implements RevokingDatabase {
     disabled = true;
   }
 
+  // tmpLevelDBをとじて、きれいにshutdown
   @Override
   public void shutdown() {
     System.err.println("******** begin to pop revokingDb ********");
@@ -225,6 +242,7 @@ public class SnapshotManager implements RevokingDatabase {
     System.err.println("******** end to pop revokingDb ********");
   }
 
+  // hops回、rootのsolidity(?)をすすめる
   public void updateSolidity(int hops) {
     for (int i = 0; i < hops; i++) {
       for (RevokingDBWithCachingNewValue db : dbs) {
@@ -347,6 +365,7 @@ public class SnapshotManager implements RevokingDatabase {
       }
     }
 
+    // TODO tmpLevelDbDataSource の書き込み箇所
     tmpLevelDbDataSource =
         new LevelDbDataSourceImpl(Args.getInstance().getOutputDirectoryByDbName("tmp"), "tmp");
     tmpLevelDbDataSource.initDB();

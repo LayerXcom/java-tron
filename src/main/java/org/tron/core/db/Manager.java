@@ -657,7 +657,7 @@ public class Manager {
     }
   }
 
-  // SPVがブロックを受け入れるタイプ。
+  // SolidityNodeがブロックを受け入れるタイプ。
   public void pushVerifiedBlock(BlockCapsule block) throws ContractValidateException,
       ContractExeException, ValidateSignatureException, AccountResourceInsufficientException,
       TransactionExpirationException, TooBigTransactionException, DupTransactionException,
@@ -918,6 +918,7 @@ public class Manager {
   }
 
   public void updateDynamicProperties(BlockCapsule block) {
+    // ブロック受け入れ後、動的パラメーター更新
     long slot = 1;
     if (block.getNum() != 1) {
       slot = witnessController.getSlotAtTime(block.getTimeStamp());
@@ -1006,6 +1007,7 @@ public class Manager {
     }
   }
 
+  // テスト用？？
   public void setBlockReference(TransactionCapsule trans) {
     byte[] headHash = getDynamicPropertiesStore().getLatestBlockHeaderHash().getBytes();
     long headNum = getDynamicPropertiesStore().getLatestBlockHeaderNumber();
@@ -1047,8 +1049,9 @@ public class Manager {
 
     if (trxCap.getInstance().getRawData().getContractList().size() != 1) {
       throw new ContractSizeNotEqualToOneException(
-          "act size should be exactly 1, this is extend feature");
+              "act size should be exactly 1, this is extend feature");
     }
+
 
     validateDup(trxCap);
 
@@ -1317,11 +1320,15 @@ public class Manager {
     if (getDynamicPropertiesStore().getAllowAdaptiveEnergy() == 1) {
       updateAdaptiveTotalEnergyLimit();
     }
+    // 動的パラメーター更新
     this.updateDynamicProperties(block);
+    // 最新blockを生成したwitnessに関する情報更新
     this.updateSignedWitness(block);
+    // finality?更新
     this.updateLatestSolidifiedBlock();
     this.updateTransHashCache(block);
     updateMaintenanceState(needMaint);
+    // TaPoS用の最新ブロック更新
     updateRecentBlock(block);
   }
 
@@ -1360,6 +1367,7 @@ public class Manager {
     }
   }
 
+  // TaPoS用の最新ブロック更新。 blockNum => BlockID の形式
   public void updateRecentBlock(BlockCapsule block) {
     this.recentBlockStore.put(ByteArray.subArray(
         ByteArray.fromLong(block.getNum()), 6, 8),
@@ -1379,6 +1387,7 @@ public class Manager {
             .collect(Collectors.toList());
 
     long size = witnessController.getActiveWitnesses().size();
+    // (max)21 * (1 - 0.7) = 7
     int solidifiedPosition = (int) (size * (1 - SOLIDIFIED_THRESHOLD * 1.0 / 100));
     if (solidifiedPosition < 0) {
       logger.warn(
@@ -1441,6 +1450,7 @@ public class Manager {
    * block num 2. pay the trx to witness. 3. the latest slot num.
    */
   public void updateSignedWitness(BlockCapsule block) {
+    // 最新blockを生成したwitnessに関する情報更新
     // TODO: add verification
     WitnessCapsule witnessCapsule =
         witnessStore.getUnchecked(

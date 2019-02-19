@@ -25,6 +25,7 @@ import org.tron.core.exception.ItemNotFoundException;
 
 @Slf4j
 public abstract class TronStoreWithRevoking<T extends ProtoCapsule> implements ITronChainBase<T> {
+  // revokingDB (LevelDB + cache) のバージョン出し分けてアクセスするマン。あらゆるデータが入る。
   @Getter // only for unit test
   protected IRevokingDB revokingDB;
   private TypeToken<T> token = new TypeToken<T>(getClass()) {};

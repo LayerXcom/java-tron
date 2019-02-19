@@ -42,10 +42,12 @@ public class RevokingDBWithCachingNewValue implements IRevokingDB {
     if (mode.get() == null || mode.get()) {
       return head;
     } else {
+      // solidity modeは、solidityプロパティを返す
       return head.getSolidity();
     }
   }
 
+  // HEAD pointer (or solidity property)
   public synchronized Snapshot getHead() {
     return head();
   }

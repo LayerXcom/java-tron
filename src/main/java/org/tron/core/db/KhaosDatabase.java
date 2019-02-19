@@ -74,17 +74,21 @@ public class KhaosDatabase extends TronDatabase {
     }
   }
 
-  // KhaosBlockのKVS 順番つきで、最新1024個まで保持
+  // KhaosBlockのStore(forkした分まで持つ。) 最新1024 BlockNumまで保持
   public class KhaosStore {
 
+    // (1)BlockID => Block
     private HashMap<BlockId, KhaosBlock> hashKblkMap = new HashMap<>();
     // private HashMap<Sha256Hash, KhaosBlock> parentHashKblkMap = new HashMap<>();
     private int maxCapcity = 1024;
 
+    // (2)挿入順序を保持したHashMap. blockNum => [Block]. 古いものは消されていくので、finalityを得ていく。
+    // 最初にきたブロックが優先。
     @Getter
     private LinkedHashMap<Long, ArrayList<KhaosBlock>> numKblkMap =
         new LinkedHashMap<Long, ArrayList<KhaosBlock>>() {
 
+        // capacity維持のために、勝手によばれるメソッド
           @Override
           protected boolean removeEldestEntry(Map.Entry<Long, ArrayList<KhaosBlock>> entry) {
             long minNum = Long.max(0L, head.num - maxCapcity);
@@ -107,9 +111,11 @@ public class KhaosDatabase extends TronDatabase {
 
     public void insert(KhaosBlock block) {
       hashKblkMap.put(block.id, block);
+      // computeIfAbsent: 要素ないときだけ追加
       numKblkMap.computeIfAbsent(block.num, listBlk -> new ArrayList<>()).add(block);
     }
 
+    // block hashをもとにKhaosStoreの2つのHashMapから消す
     public boolean remove(Sha256Hash hash) {
       KhaosBlock block = this.hashKblkMap.get(hash);
       // Sha256Hash parentHash = Sha256Hash.ZERO_HASH;
@@ -188,11 +194,13 @@ public class KhaosDatabase extends TronDatabase {
     this.head = blk;
   }
 
+  // KhaosStoreから実際にBlock消してHEADを変える
   void removeBlk(Sha256Hash hash) {
     if (!miniStore.remove(hash)) {
       miniUnlinkedStore.remove(hash);
     }
 
+    // その後最新HEADにかえる
     head = miniStore.numKblkMap.entrySet().stream()
         .max(Comparator.comparingLong(Map.Entry::getKey))
         .map(Map.Entry::getValue)

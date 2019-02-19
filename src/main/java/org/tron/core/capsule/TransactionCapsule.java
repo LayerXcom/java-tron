@@ -187,6 +187,7 @@ public class TransactionCapsule implements ProtoCapsule<Transaction> {
         .build();
   }
 
+  // wallet側のTX生成時によばれるみたい
   public void setReference(long blockNum, byte[] blockHash) {
     byte[] refBlockNum = ByteArray.fromLong(blockNum);
     Transaction.raw rawData = this.transaction.getRawData().toBuilder()

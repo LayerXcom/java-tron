@@ -18,10 +18,13 @@ import java.util.Map;
 import java.util.Set;
 
 public class SnapshotImpl extends AbstractSnapshot<Key, Value> {
+  // Snapshotの実際の実装。前後のSnapShotにつながる、リスト形式になっている。
   @Getter
   protected Snapshot root;
 
   SnapshotImpl(Snapshot snapshot) {
+    // 前のと相互に参照できるようにして、新しいのつくるよ
+    // rootはそのままだよ。
     root = snapshot.getRoot();
     previous = snapshot;
     snapshot.setNext(this);
@@ -43,6 +46,7 @@ public class SnapshotImpl extends AbstractSnapshot<Key, Value> {
 
   @Override
   public void remove(byte[] key) {
+    // DELETEが記録される
     Preconditions.checkNotNull(key, "key in db is not null.");
     db.put(Key.of(key), Value.of(Value.Operator.DELETE, null));
   }
@@ -141,16 +145,19 @@ public class SnapshotImpl extends AbstractSnapshot<Key, Value> {
   });
   }
 
+  // retreadは前のを参照
   @Override
   public Snapshot retreat() {
     return previous;
   }
 
+  // root.
   @Override
   public Snapshot getSolidity() {
     return root.getSolidity();
   }
 
+  // collect(cache側) + root(LevelDB)のiterator.
   @Override
   public Iterator<Map.Entry<byte[],byte[]>> iterator() {
     Map<WrappedByteArray, WrappedByteArray> all = new HashMap<>();
@@ -161,10 +168,12 @@ public class SnapshotImpl extends AbstractSnapshot<Key, Value> {
     return Iterators.concat(
         Iterators.transform(all.entrySet().iterator(),
             e -> Maps.immutableEntry(e.getKey().getBytes(), e.getValue().getBytes())),
+        // levelDB側のiterator. cacheにないものにfilterする.
         Iterators.filter(getRoot().iterator(),
             e -> !keys.contains(WrappedByteArray.of(e.getKey()))));
   }
 
+  // allに過去からの全値をset
   void collect(Map<WrappedByteArray, WrappedByteArray> all) {
     Snapshot next = getRoot().getNext();
     while (next != null) {
